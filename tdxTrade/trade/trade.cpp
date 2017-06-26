@@ -393,9 +393,21 @@ int TdxL2Test()
 	return 0;
 }
 
+void test_mult_Thread() {
+	sharelist.initFromFile("HALL.blk");
+	//sharelist.initFromFile("XA1.blk");
+	QuoteThreadPool *quoteThreadPool=new QuoteThreadPool(sharelist,1);
+	quoteThreadPool->SetEventAll();
+	Sleep(1000);
+	quoteThreadPool->waitEventAll();
+	while (1) {}
 
+
+
+}
 int main()
 {
+	test_mult_Thread();
     char* zqdm[]={"600778","300010"};
     int nRetCode = 0;
     short count;
@@ -433,7 +445,7 @@ int main()
 	}
 	fprintf(hFile, "asdfasdfasdf:%d", 123123);
 	//fclose(hFile);
-TRADE_TEST:
+//TRADE_TEST:
 	yhLib.init(_T("trade_yhzq.dll"));
 	yhLib.login("219.143.214.206", 443);
 	p("1\n");

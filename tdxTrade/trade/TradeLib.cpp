@@ -10,10 +10,10 @@
 
 DataPaser tmpPaser;
 ShareQuotation quotation;
-TradeLib yhLib = TradeLib(5, "", "", YHZQ_SH_PROFILE, YHZQ_SZ_PROFILE);
-TradeLib gjLib = TradeLib(GJZQ_ID, "", "", GJZQ_SH_PROFILE, GJZQ_SZ_PROFILE);
-TradeLib gjRLib = TradeLib(GJZQ_R_ID, "", "", GJZQ_R_SH_PROFILE, GJZQ_R_SZ_PROFILE);
-TradeLib whLib = TradeLib(WHZQ_ID, "", "", WHZQ_SH_PROFILE, WHZQ_SZ_PROFILE);
+TradeLib yhLib = TradeLib(5, "11100028250", "Wx801123", YHZQ_SH_PROFILE, YHZQ_SZ_PROFILE);
+TradeLib gjLib = TradeLib(GJZQ_ID, "39958469", "880418", GJZQ_SH_PROFILE, GJZQ_SZ_PROFILE);
+TradeLib gjRLib = TradeLib(GJZQ_R_ID, "139958469", "041888", GJZQ_R_SH_PROFILE, GJZQ_R_SZ_PROFILE);
+TradeLib whLib = TradeLib(WHZQ_ID, "2200001507", "618518", WHZQ_SH_PROFILE, WHZQ_SZ_PROFILE);
 
 TradeLib::TradeLib() {
 	branchID_ = -1;
@@ -241,11 +241,11 @@ int TradeLib::updateQuotation() {
 			pShareInfo = freeShares[tmpPaser.getItem("代码", i)];
 			strncpy_s(pShareInfo->strTime, tmpPaser.getItem("时间", i), 31);
 			strncpy_s(pShareInfo->strClose, tmpPaser.getItem("现价", i), sizeof(ShareInfo::strClose) - 1);
-			pShareInfo->close_last = (atof(tmpPaser.getItem("昨收", i)) );
-			pShareInfo->close = (atof(pShareInfo->strClose) );
-			pShareInfo->open = (atof(tmpPaser.getItem("开盘", i)) );
-			pShareInfo->high = (atof(tmpPaser.getItem("最高", i)) );
-			pShareInfo->low = (atof(tmpPaser.getItem("最低", i)) );
+			pShareInfo->close_last =(float)(atof(tmpPaser.getItem("昨收", i)) );
+			pShareInfo->close = (float)(atof(pShareInfo->strClose) );
+			pShareInfo->open = (float)(atof(tmpPaser.getItem("开盘", i)) );
+			pShareInfo->high = (float)(atof(tmpPaser.getItem("最高", i)) );
+			pShareInfo->low = (float)(atof(tmpPaser.getItem("最低", i)) );
 			//14:59:69
 
 

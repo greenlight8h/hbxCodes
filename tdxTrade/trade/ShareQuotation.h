@@ -1,4 +1,4 @@
-#pragma once
+
 #include "windows.h"
 #include "stdio.h"
 #include "string.h"
@@ -6,7 +6,7 @@
 #include "TradeLib.h"
 #include "tdxfuncType.h"
 #include "TradeLogger.h"
-
+#pragma once
 
 class ShareQuotation
 {
@@ -91,7 +91,7 @@ class ShareQuotation
 /// <param name="Result">此API执行返回后，Result内保存了返回的查询数据, 形式为表格数据，行数据之间通过\n字符分割，列数据之间通过\t分隔。一般要分配1024*1024字节的空间。出错时为空字符串。</param>
 /// <param name="ErrInfo">此API执行返回后，如果出错，保存了错误信息说明。一般要分配256字节的空间。没出错时为空字符串。</param>
 /// <returns>成功返货true, 失败返回false</returns>
-#define MAX_COONT_ONCE 81
+#define MAX_COUNT_ONCE 81
         int get_quotes(byte marketList[],char* Zqdm[], short& Count, char* Result){
 			int realcount=0;
 			char* tmpResult = Result;
@@ -106,22 +106,23 @@ class ShareQuotation
 
 			}*/
 			do {
-				if ((Count - realcount) < MAX_COONT_ONCE) {
+				if ((Count - realcount) < MAX_COUNT_ONCE) {
 					once_count = Count - realcount;
 				}
 				else {
-					once_count = MAX_COONT_ONCE;
+					once_count = MAX_COUNT_ONCE;
 				}
-				bRet = TdxHq_GetSecurityQuotes(marketList, Zqdm, once_count, tmpResult, ErrInfo_);
+ 				bRet = TdxHq_GetSecurityQuotes(marketList, Zqdm, once_count, tmpResult, ErrInfo_);
 				CHECK_BOOL_RETURN(bRet, ErrInfo_);
-				//int len = strlen(tmpResult);
-				tmpResult += strlen(tmpResult);
+				int len = strlen(tmpResult);
+				//p(tmpResult);
+				tmpResult += len;
 				marketList += once_count;
 				Zqdm += once_count;
 				realcount += once_count;
 			} while (realcount < Count);
 			//int len = strlen(Result);
-           // p("%s\n",Result);
+            //p("%s\n", Result);
 			Count = realcount;
             return RET_SUCCESS;
         }

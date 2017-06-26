@@ -15,61 +15,16 @@ struct ShareQuoteInfo {
 
 struct QuoteThreadPara {
 	int count;
+	HANDLE hParaEvent;
 	char **codeList;
 	byte *marketList;
 	ShareQuoteInfo *quoteNow;
 	queue<ShareQuoteInfo> *quoteQueue;
 };
 
-class ShareList;
-
-class QuoteThreadPool {
-private:
-	const static int MAX_THREAD_NUM=20;
-	HANDLE hThread[MAX_THREAD_NUM];
-	QuoteThreadPara threadPara[MAX_THREAD_NUM];
-public:
-	QuoteThreadPool(ShareList &shareList, int threadNum){
-		int count = shareList.getShareCount();
-		int perThreadCount = count / threadNum;
-		int lastThreadCound = count - perThreadCount*(threadNum - 1);
-		for (int i = 0; i < threadNum; i++ ) {
-			threadPara[i].count = perThreadCount;
-			threadPara[i].codeList = shareList.codeList + i*perThreadCount;
-			hThread[i] = CreateThread(NULL, 0, QuoteThreadPool::ThreadFun, &threadPara[i], 0, NULL);
-		}
-	}
-
-	static DWORD WINAPI ThreadFun(LPVOID pPara)
-	{
-		int ret;
-
-		DWORD threadID = GetCurrentThreadId();
-		QuoteThreadPara *threadPara = (QuoteThreadPara *)pPara;
-		//printf("子线程的线程ID号为：%d\n子线程输出Hello World\n", );
-		ShareQuotation quotation;
-		quotation.init(_T("TdxHqApi.dll"));
-		quotation.connect("218.75.75.20", 443);
-		short count = threadPara->count;
-		char* result=new char(300 * threadPara->count);//one share need 300 for quotation
-		ret = quotation.get_quotes(threadPara->marketList, threadPara->codeList, count, result);
-		if (ret == RET_FAILED) {
-			p("reconect \n");
-			quotation.connect("218.75.75.20", 443);
-			ret = quotation.get_quotes(threadPara->marketList, threadPara->codeList, count, result);
-
-			//getchar();
-
-		}
-		if (count != threadPara->count) {
-			printf("count != threadPara->count");
-		}
-		free(result);
-		return 0;
-	}
 
 
-};
+
 class ShareList
 {
     private:
@@ -142,6 +97,7 @@ class ShareList
 
 
 };
+
 class DataPaser
 {
     private:
@@ -250,5 +206,96 @@ class DataPaser
 		int getRowNum() {
 			return rowNum;
 		}
+
+};
+
+class QuoteThreadPool {
+private:
+	const static int MAX_THREAD_NUM = 20;
+	HANDLE hThread[MAX_THREAD_NUM];
+	HANDLE hEvent[MAX_THREAD_NUM];
+	QuoteThreadPara threadPara[MAX_THREAD_NUM];
+	int threadNum_;
+public:
+	QuoteThreadPool(ShareList &shareList, int threadNum) {
+		threadNum_ = threadNum;
+		int count = shareList.getShareCount();
+		int perThreadCount = count / threadNum;
+		int lastThreadCound = count - perThreadCount*(threadNum - 1);
+		for (int i = 0; i < threadNum; i++) {
+			threadPara[i].count = perThreadCount;
+			threadPara[i].marketList = shareList.marketList;
+			threadPara[i].codeList = shareList.codeList + i*perThreadCount;
+			threadPara[i].quoteNow = shareList.quoteNow;
+			threadPara[i].quoteQueue = shareList.quoteQueue;
+			hEvent[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
+			hThread[i] = CreateThread(NULL, 0, QuoteThreadPool::ThreadFun, &threadPara[i], 0, NULL);
+			//ThreadFun(&threadPara[i]);
+		}
+	}
+	void waitEventAll() {
+		DWORD dwRet;
+		dwRet =WaitForMultipleObjects(threadNum_, hEvent, TRUE, INFINITE);
+
+	}
+
+	void SetEventAll() {
+		for (int i = 0; i < threadNum_; i++) {
+			SetEvent(hEvent[i]);
+		}
+	}
+	static DWORD WINAPI ThreadFun(LPVOID pPara)
+	{
+		int ret;
+		DataPaser quotesData;
+
+		DWORD threadID = GetCurrentThreadId();
+		QuoteThreadPara *threadPara = (QuoteThreadPara *)pPara;
+		HANDLE hParaEvent = threadPara->hParaEvent;
+		printf("子线程的线程ID号为：%d", threadID);
+		ShareQuotation *quotation = new ShareQuotation;
+		(*quotation).init(_T("TdxHqApi.dll"));
+		//(*quotation).connect("218.75.75.20", 443);//银河证券杭州电信通用
+		//(*quotation).connect("61.135.173.136", 443); //银河证券北京联通通用
+		(*quotation).connect("203.212.5.66", 7709); //平安证券北京行情
+
+		short count = threadPara->count;
+		char* result = new char[300 * threadPara->count];//one share need 300 for quotation
+		DWORD dwRet = WaitForSingleObject(hParaEvent, INFINITE);
+		ret = (*quotation).get_quotes(threadPara->marketList, threadPara->codeList, count, result);
+		if (ret == RET_FAILED) {
+			p("reconect \n");
+			(*quotation).connect("218.75.75.20", 443);
+			ret = (*quotation).get_quotes(threadPara->marketList, threadPara->codeList, count, result);
+
+			//getchar();
+
+		}
+		if (count != threadPara->count) {
+			printf("count != threadPara->count");
+		}
+		ShareQuoteInfo *quoteNow = threadPara->quoteNow;
+		quotesData.paserData(result);
+		//quotesData.print();
+		//p("haha:%s\n", quotesData.getItem("买一价",1));
+		for (int i = 1; i < count + 1; ++i)
+		{
+			//p("haha:%s\n", quotesData.getItem("卖一量", i));
+			//p("haha:%s\n", quotesData.getItem("买一量", i));
+			//p("haha:%s\n", quotesData.getItem("买一价", i));
+			quoteNow[i - 1].curPrice = (int)(atof(quotesData.getItem("买一价", i)) * 100);
+			//sellVol1 = atoi(quotesData.getItem("卖一量", i));
+			//buyVol1 = atoi(quotesData.getItem("买一量", i));
+			//buyPrice1 = (int)(atof(quotesData.getItem("买一价", i)) * 100);
+			//buyAmount1 = (int64_t)buyPrice1 *buyVol1;
+			//p("卖一量:%d   买一量：%d price:%d buyAmount1:%lldw\n", sellVol1, buyVol1, buyPrice1, buyAmount1/10000);
+
+
+		}
+		SetEvent(hParaEvent);
+		delete[]result;
+		return 0;
+	}
+
 
 };
