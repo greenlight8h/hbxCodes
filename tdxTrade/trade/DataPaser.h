@@ -1,25 +1,21 @@
+#include "hbx_helper.h"
 #include "TradeLib.h"
-#include "TradeLogger.h"
+
 #include "ShareQuotation.h"
-#include <queue>
+#include "ShareData.h"
+//#include <queue>
 #pragma once
-#define MAX_ROW_NUM 100
-#define MAX_COL_NUM 50
-#define MAX_DATA_SIZE 1024*100
-struct ShareQuoteInfo {
-	int curPrice;
-	int high;
-	int low;
-	int yesterdayPrice;
-};
+
+
+
 
 struct QuoteThreadPara {
 	int count;
 	HANDLE hParaEvent;
 	char **codeList;
 	byte *marketList;
-	ShareQuoteInfo *quoteNow;
-	queue<ShareQuoteInfo> *quoteQueue;
+	//ShareQuoteInfo *quoteNow;
+	//queue<ShareQuoteInfo> *quoteQueue;
 };
 
 
@@ -28,17 +24,17 @@ struct QuoteThreadPara {
 class ShareList
 {
     private:
-        const static int max_count=3300;
+        //const static int MAX_SHARE_COUNT=3300;
         FILE *hFile;
-		char codeListBuf[max_count][7];
+		char codeListBuf[MAX_SHARE_COUNT][7];
 
-		ShareQuotation *pShareQuotation;
+		//ShareQuotation *pShareQuotation;
 	public:
 
-		char *codeList[max_count];
-		byte marketList[max_count];
-		ShareQuoteInfo quoteNow[max_count];//最新行情
-		queue<ShareQuoteInfo> quoteQueue[max_count];//旧行情队列，用于计算涨速
+		char *codeList[MAX_SHARE_COUNT];
+		byte marketList[MAX_SHARE_COUNT];
+		//ShareQuoteInfo quoteNow[MAX_SHARE_COUNT];//最新行情
+		//queue<ShareQuoteInfo> quoteQueue[MAX_SHARE_COUNT];//旧行情队列，用于计算涨速
 		int count;
 
 
@@ -98,116 +94,6 @@ class ShareList
 
 };
 
-class DataPaser
-{
-    private:
-        int colNum;
-        int rowNum;
-        char dataBuf[MAX_DATA_SIZE];
-        char* rows[MAX_ROW_NUM][MAX_COL_NUM];
-        
-
-    public:
-		DataPaser() { };
-		~DataPaser() {};
-
-		DataPaser(char* queryData) {
-			paserData(queryData);
-		} 
-		
-		int paserData(char* queryData) {
-            char *pData = queryData;
-            char *head = dataBuf;
-            int i = 0;
-            int colIndex = 0;
-            int rowIndex = 0;
-            colNum = 0;
-            rowNum = 0;
-            ASSERT(queryData);
-            while (pData[i] != '\0') {
-                if (pData[i] == '\t') {
-                    //rowNum++;//最后一行无'\n'
-                    rows[rowIndex][colIndex++] = head;
-                    head = dataBuf + i + 1;
-
-                    dataBuf[i] = '\0';
-                }
-                else if (pData[i] == '\n') {
-                    rowNum++;
-                    rows[rowIndex++][colIndex++] = head;
-                    if (colNum == 0) {
-                        colNum = colIndex;
-                    }
-                    else if (colNum != colIndex) {
-                        p("wrong data\n");
-                        return RET_FAILED;
-                    }
-                    colIndex = 0;
-                    head = dataBuf + i + 1;
-                    dataBuf[i] = '\0';
-                }
-                else {
-                    dataBuf[i] = queryData[i];
-
-
-                }
-                i++;
-                if (i >= MAX_DATA_SIZE) {
-                    p("buff overflow\n");
-					return RET_FAILED;
-
-                }
-            }
-            dataBuf[i] = '\0';
-            if (rowNum > 0) {//最后一行无'\n'
-                rows[rowIndex][colIndex] = head;
-                rowNum++;
-            }
-			return RET_SUCCESS;
-        }
-
-        void print() {
-            p("======================================\n");
-            int i = 0, j = 0;
-            for (i = 0; i < rowNum; i++)
-            {
-                for (j = 0; j < colNum; j++)
-                {
-                    if (rows[i][j][0] == '\0') {
-                        p("N/A\t");
-                    }
-                    else {
-                        p("%s\t", rows[i][j]);
-                    }
-
-
-                }
-                p("\n");
-
-            }
-            p("======================================\n");
-
-        }
-        char *getItem(char* title, int rowIndex) {
-            //first ROW is titles;
-            int i;
-            if (rowIndex > rowNum - 1 || rowIndex < 1) return NULL;
-            for (i = 0; i < colNum; i++)
-            {
-
-                if (strcmp(rows[0][i], title) == 0) {
-                    return rows[rowIndex][i];
-
-                }
-
-            }
-            return NULL;
-        }
-		int getRowNum() {
-			return rowNum;
-		}
-
-};
 
 class QuoteThreadPool {
 private:
@@ -226,8 +112,8 @@ public:
 			threadPara[i].count = perThreadCount;
 			threadPara[i].marketList = shareList.marketList;
 			threadPara[i].codeList = shareList.codeList + i*perThreadCount;
-			threadPara[i].quoteNow = shareList.quoteNow;
-			threadPara[i].quoteQueue = shareList.quoteQueue;
+			//threadPara[i].quoteNow = shareList.quoteNow;
+			//threadPara[i].quoteQueue = shareList.quoteQueue;
 			hEvent[i] = CreateEvent(NULL, FALSE, FALSE, NULL);
 			hThread[i] = CreateThread(NULL, 0, QuoteThreadPool::ThreadFun, &threadPara[i], 0, NULL);
 			//ThreadFun(&threadPara[i]);
@@ -249,6 +135,7 @@ public:
 		int ret;
 		DataPaser quotesData;
 
+
 		DWORD threadID = GetCurrentThreadId();
 		QuoteThreadPara *threadPara = (QuoteThreadPara *)pPara;
 		HANDLE hParaEvent = threadPara->hParaEvent;
@@ -260,38 +147,50 @@ public:
 		(*quotation).connect("203.212.5.66", 7709); //平安证券北京行情
 
 		short count = threadPara->count;
-		char* result = new char[300 * threadPara->count];//one share need 300 for quotation
+		char lastResult[QUOTE_LINE_MAX_SIZE];
+		char* result = new char[QUOTE_LINE_MAX_SIZE * threadPara->count+ QUOTE_HEADER_SIZE];
+		vector<QuotoData*> *pQuoteVec;
 		DWORD dwRet = WaitForSingleObject(hParaEvent, INFINITE);
-		ret = (*quotation).get_quotes(threadPara->marketList, threadPara->codeList, count, result);
-		if (ret == RET_FAILED) {
-			p("reconect \n");
-			(*quotation).connect("218.75.75.20", 443);
+		for (int j = 0; j < 100; ) {
 			ret = (*quotation).get_quotes(threadPara->marketList, threadPara->codeList, count, result);
+			
+			if (j != 0) {
+				if (strncmp(lastResult, &result[QUOTE_HEADER_SIZE], QUOTE_LINE_MAX_SIZE) == 0) {
+					Sleep(100);
+					//j--;
+					continue;
+				}
+			}
+			j++;
+			strncpy(lastResult, &result[QUOTE_HEADER_SIZE], QUOTE_LINE_MAX_SIZE);
+			if (count != threadPara->count) {
+				printf("count != threadPara->count");
+			}
 
-			//getchar();
+			quotesData.paserData(result);
+			//quotesData.print();
 
+			for (int i = 1; i < count + 1; ++i)
+			{
+				//p("haha:%s\n", quotesData.getItem("代码", i));
+				//p("haha:%s\n", quotesData.getItem("现价", i));
+				//p("haha:%s\n", quotesData.getItem("时间", i));
+
+				int code = atoi(quotesData.getItem("代码", i));
+				int id = g_shareIdMap[code];
+				u32 time= (u32)(atoi(quotesData.getItem("时间", i)));
+				pQuoteVec = &g_shareDataAll[id].quotoDayVec[0]->quotoVec;
+				if (pQuoteVec->size()>1 && time == pQuoteVec->back()->time) {
+					break;
+				}
+				QuotoData *pQuotoInfo = new QuotoData;
+				pQuotoInfo->set_data(&quotesData, i);
+
+				g_shareDataAll[id].addQuotoData(pQuotoInfo);
+			}
+			Sleep(3000);
 		}
-		if (count != threadPara->count) {
-			printf("count != threadPara->count");
-		}
-		ShareQuoteInfo *quoteNow = threadPara->quoteNow;
-		quotesData.paserData(result);
-		//quotesData.print();
-		//p("haha:%s\n", quotesData.getItem("买一价",1));
-		for (int i = 1; i < count + 1; ++i)
-		{
-			//p("haha:%s\n", quotesData.getItem("卖一量", i));
-			//p("haha:%s\n", quotesData.getItem("买一量", i));
-			//p("haha:%s\n", quotesData.getItem("买一价", i));
-			quoteNow[i - 1].curPrice = (int)(atof(quotesData.getItem("买一价", i)) * 100);
-			//sellVol1 = atoi(quotesData.getItem("卖一量", i));
-			//buyVol1 = atoi(quotesData.getItem("买一量", i));
-			//buyPrice1 = (int)(atof(quotesData.getItem("买一价", i)) * 100);
-			//buyAmount1 = (int64_t)buyPrice1 *buyVol1;
-			//p("卖一量:%d   买一量：%d price:%d buyAmount1:%lldw\n", sellVol1, buyVol1, buyPrice1, buyAmount1/10000);
-
-
-		}
+		printf("over----------------------------\n");
 		SetEvent(hParaEvent);
 		delete[]result;
 		return 0;
