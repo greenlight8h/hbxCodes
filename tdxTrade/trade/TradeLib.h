@@ -1,71 +1,15 @@
 #ifndef _TRADE_LIB_H_
 #define _TRADE_LIB_H_
 
-#include <map>
-#include <vector>
-#include "windows.h"
-#include "stdio.h"
-#include "string.h"
+#ifdef TDX_TRADE_DLL
+#include "hbx_helper.h"
 #include "tdxfuncType.h"
-#define RET_SUCCESS 0
-#define RET_FAILED  0x8000
-using namespace std;
-//extern DataPaser tmpPaser;
-//extern ShareQuotation quotation;
+#include "accountInfo.h"
 
-//检查handle不正确，返回
-#define CHECK_HANDLE_RETURN(handle,info)			\
-    do{											\
-        if(handle == NULL) {							\
-			p("%s ERROR!",info);		\
-            return RET_FAILED;					\
-        }										\
-    }while(0)   
-//检查ret不正确，返回
-#define CHECK_BOOL_RETURN(ret,info)         \
-    do{                             \
-        if(!ret) {    \
-            printf("%s ERROR",info);\
-            return RET_FAILED;                 \
-        }                           \
-    }while(0)   
-#if 0
-//检查ret不正确，返回
-#define CHECK_RET_RETURN(ret，info)         \
-    do{                             \
-        if(ret != RET_SUCCESS) {    \
-			printf("%s ERROR:%x",info,ret);\
-            return ret;                 \
-        }                           \
-    }while(0)   
-
-
-//检查ret不正确，挂起
-#define CHECK_RET_HALT(ret)         \
-    do{                             \
-        if(ret != RET_SUCCESS) {    \
-            halt();                 \
-        }                           \
-    }while(0)   
-
-
-//检查ret不正确，软复位
-#define CHECK_RET_RESET(ret)        \
-    do{                             \
-        if(ret != RET_SUCCESS) {    \
-            soft_reset();           \
-        }                           \
-    }while(0)          
-
-//检查ret不正确，跳转到ERROR处
-#define CHECK_RET_GOTO_ERROR(ret)   \
-    do{                             \
-        if(ret != RET_SUCCESS) {    \
-            goto ERROR;             \
-        }                           \
-    }while(0)   
-#endif
-
+struct server_info {
+	string ip;
+	short port;
+};
 
 #define ORDER_BUY  0
 #define ORDER_SELL 1
@@ -74,56 +18,51 @@ using namespace std;
 
 #define ORDER_LIMIT_PRICE  0
 
-#define YHZQ_SH_PROFILE ""
-#define YHZQ_SZ_PROFILE ""
-#define YHZQ_ID 5
-
-#define WHZQ_SH_PROFILE ""
-#define WHZQ_SZ_PROFILE ""
-#define WHZQ_ID 0
 #define WHZQ_IP  "210.21.212.198"
 #define WHZQ_PORT 7708
-
-#define GJZQ_SH_PROFILE ""
-#define GJZQ_SZ_PROFILE ""
-#define GJZQ_ID 1
-
-#define GJZQ_R_SH_PROFILE ""
-#define GJZQ_R_SZ_PROFILE ""
-#define GJZQ_R_ID 2
 //#define GJZQ_R_IP  "222.73.69.88"
 //#define GJZQ_R_PORT 443
 #define GJZQ_R_IP  "221.236.15.16"
 #define GJZQ_R_PORT 7708
-class ShareInfo {
-public:
-	int id;
-	char code[8];
-	char name[12];
-	char strTime[32];
-	char strFreeNum[32];
-	char strClose[32];
+struct PositionInfo {
+	int code;
 	int freeNum;
-	float close_last;
-	float open;
-	float close;
-	float high;
-	float low;
-	float high_limit;
-	float low_limit;
-
+	int firstCost;
 };
+
+struct OrderInfo {
+	int code;
+	int num;
+	int price;
+	int action; //buy or sell
+	int bDone;
+};
+
+
+struct DealInfo {
+	string time;
+	string code;
+	string name;
+	string op;
+	string price;
+	string vol;
+	string amount;
+	string okNum;
+	string onwayNum;
+};
+
 
 class TradeLib
 {
+public:
+	vector<PositionInfo*> positionVec;
+	vector<OrderInfo*> orderVec;
+	vector<server_info*> serverVec; //fastest in first 
 private:
 	char result[1024*5];
 	int freeMoney=0;
-	//vector<ShareInfo*> freeShares;
-	ShareInfo *pShareInfo;
 
-	//char libname_[32];
-	//char libname_[32];
+
 	BOOL bInited_=FALSE;
 	int clientID_;
 	char ErrInfo_[256];
@@ -132,6 +71,7 @@ private:
 	char szID_[32];
 	char account_[32];
 	char pass_[32];
+	char clientVersion_[8];
 
 	OpenTdxDelegate OpenTdx;
 	CloseTdxDelegate CloseTdx;
@@ -143,15 +83,15 @@ private:
 	GetQuoteDelegate GetQuote;
 	RepayDelegate Repay;
 public:
-	map<string, ShareInfo*> freeShares;
-	map<string, ShareInfo*>::iterator it;
 
 	TradeLib();
-	TradeLib(short branchID, char* account, char *pass, char* shID, char* szID);
+	TradeLib(short branchID, char* account, char *pass, char* shID, char* szID, char* clientVersion);
 	~TradeLib() {}
 	int init(TCHAR* libname);
+	void add_server(char* ip, short port);
+	server_info& getFastServer();
 
-	int login(char* ip, int port);
+	int login();
 	int sendOrder(int orderType, int priceType, char* shareCode, float price, int quantity, char* Result);
 	int cancelOrder(char* exchangeID, char* orderSn, char* Result);
 	int sell(char* shareCode, float price, int quantity, int priceType = ORDER_LIMIT_PRICE);
@@ -167,14 +107,13 @@ public:
 	int queryData(int queryType, char* Result);
 
 	int updateMoney();
-	int updateShares();
+	int updatePositions();
 	int updateQuotation();
-	int getMoney();
+	int getFreeMoney();
+	int getFreePosition(int code);
 	int clearShare();
 	int clearShare(vector<string>& exceptList);
 	void selfTest();
-
-
 };
 
 
@@ -182,5 +121,5 @@ extern TradeLib yhLib;
 extern TradeLib gjLib;
 extern TradeLib gjRLib;
 extern TradeLib whLib;
-
+#endif
 #endif //_TRADE_LIB_H_

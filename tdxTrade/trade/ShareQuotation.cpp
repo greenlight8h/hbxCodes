@@ -1,4 +1,4 @@
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "ShareQuotation.h"
 
 BOOL ShareQuotation::bInit = FALSE;

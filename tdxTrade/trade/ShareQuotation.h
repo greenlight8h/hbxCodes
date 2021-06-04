@@ -1,13 +1,12 @@
 
-#include "windows.h"
-#include "stdio.h"
-#include "string.h"
-#include "tchar.h"
+#include "hbx_helper.h"
+
 #include "TradeLib.h"
 #include "tdxfuncType.h"
-#include "TradeLogger.h"
-#pragma once
 
+#pragma once
+const int QUOTE_HEADER_SIZE = 256;
+const int QUOTE_LINE_MAX_SIZE = 320;
 class ShareQuotation
 {
     private:
@@ -34,9 +33,13 @@ class ShareQuotation
         char ErrInfo_[1024];
         bool bRet;
         short Count;
+		char server_[32];
+		short port_;
 
 
     public:
+
+
         ShareQuotation();
         ~ShareQuotation();
         int init(TCHAR* libname){
@@ -65,12 +68,30 @@ class ShareQuotation
             return RET_SUCCESS;
         }
 
-        int connect(char* ip, int port) {
-            bRet = TdxHq_Connect(ip, port,Result, ErrInfo_);
-            CHECK_BOOL_RETURN(bRet, ErrInfo_);
-            p("Result:%s\n",Result);
-            return RET_SUCCESS;
+        int connect(char* ip, int port) { 
+			
+			strncpy(server_, ip, sizeof(server_));
+			port_ = port;
+
+			return 	reconnect(20);
+           
         }
+
+		int reconnect(int maxretry) {
+			while (maxretry-- > 0) {
+				bRet = TdxHq_Connect(server_, port_, Result, ErrInfo_);
+				if (bRet) {
+					p("Result:%s\n", Result);
+					return RET_SUCCESS;
+				}
+				Sleep(1000);
+			
+			}
+
+			return RET_FAILED;
+
+
+		}
 
         //数据种类, 0->5分钟K线    1->15分钟K线    2->30分钟K线  3->1小时K线    4->日K线  5->周K线  6->月K线  7->1分钟K线  8->1分钟K线  9->日K线  10->季K线  11->年K线
         int get_k_datas(byte Category, char* Zqdm, short Start, short& Count, char* Result){
@@ -91,28 +112,29 @@ class ShareQuotation
 /// <param name="Result">此API执行返回后，Result内保存了返回的查询数据, 形式为表格数据，行数据之间通过\n字符分割，列数据之间通过\t分隔。一般要分配1024*1024字节的空间。出错时为空字符串。</param>
 /// <param name="ErrInfo">此API执行返回后，如果出错，保存了错误信息说明。一般要分配256字节的空间。没出错时为空字符串。</param>
 /// <returns>成功返货true, 失败返回false</returns>
-#define MAX_COUNT_ONCE 81
+#define MAX_SHARE_COUNT_ONCE 81
         int get_quotes(byte marketList[],char* Zqdm[], short& Count, char* Result){
 			int realcount=0;
 			char* tmpResult = Result;
 			short once_count;
-			//Count -= 70;
-			//if (Count > 290) Count = 290;
- /*           byte market[290];
-			
-			for (int i = 0; i < Count; i++) {
-				if (*Zqdm[i] == '6') market[i] = 1;
-				else market[i] = 0;
 
-			}*/
 			do {
-				if ((Count - realcount) < MAX_COUNT_ONCE) {
+				if ((Count - realcount) < MAX_SHARE_COUNT_ONCE) {
 					once_count = Count - realcount;
 				}
 				else {
-					once_count = MAX_COUNT_ONCE;
+					once_count = MAX_SHARE_COUNT_ONCE;
 				}
+
  				bRet = TdxHq_GetSecurityQuotes(marketList, Zqdm, once_count, tmpResult, ErrInfo_);
+				if (!bRet) {
+					p("reconect \n");
+					reconnect(100);
+					bRet = TdxHq_GetSecurityQuotes(marketList, Zqdm, once_count, tmpResult, ErrInfo_);
+
+					//getchar();
+
+				}
 				CHECK_BOOL_RETURN(bRet, ErrInfo_);
 				int len = strlen(tmpResult);
 				//p(tmpResult);
@@ -126,6 +148,30 @@ class ShareQuotation
 			Count = realcount;
             return RET_SUCCESS;
         }
+		
+		//时间	价格 	现量 	买卖('B'/'S'/' ') 	保留
+		//09:30	2.590000	14923	 	0
+		//09:32	2.620000	1980	B	0
+		//09:32	2.620000	23	S	0
+		int get_hist_tick_data(char* Zqdm, short Start, short& Count, int Date, char* Result) {
+			byte market = 0;
+			if (*Zqdm == '6') market = 1;
+			bRet = TdxHq_GetHistoryTransactionData(market, Zqdm, Start, Count, Date, Result, ErrInfo_);
+			CHECK_BOOL_RETURN(bRet, ErrInfo_);
+			p("%s\n", Result);
+
+			return RET_SUCCESS;
+		}
+
+		int get_tick_data(char* Zqdm, short Start, short& Count, char* Result) {
+			byte market = 0;
+			if (*Zqdm == '6') market = 1;
+			bRet = TdxHq_GetTransactionData(market, Zqdm, Start, Count, Result, ErrInfo_);
+			CHECK_BOOL_RETURN(bRet, ErrInfo_);
+			p("%s\n", Result);
+
+			return RET_SUCCESS;
+		}
 
 
 
